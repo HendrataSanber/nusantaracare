@@ -3,7 +3,6 @@ import os
 from pathlib import Path
 
 import chromadb
-from fastembed import TextEmbedding
 from openai import OpenAI
 from dotenv import load_dotenv
 
@@ -12,13 +11,14 @@ load_dotenv()
 client = chromadb.PersistentClient(path="chroma_db")
 
 collection = client.get_or_create_collection(
-    name="nusantaracare_kb",
+    name="nusantaracare_kb_openai",
     metadata={"hnsw:space": "cosine"}
 )
 
-model = TextEmbedding(
-    model_name="intfloat/multilingual-e5-large"
-)
+# model = TextEmbedding(
+#     model_name="intfloat/multilingual-e5-large"
+# )
+embedding_model = "text-embedding-3-small"
 
 llm = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
@@ -88,8 +88,14 @@ def index_document():
 
             start += chunk_size - overlap
 
-    embeddings = list(model.embed(chunks))
-    embeddings = [embedding.tolist() for embedding in embeddings]
+    # embeddings = list(model.embed(chunks))
+    # embeddings = [embedding.tolist() for embedding in embeddings]
+    response = llm.embeddings.create(
+        model=embedding_model,
+        input=chunks
+    )
+
+    embeddings = [item.embedding for item in response.data]
 
     collection.add(
         ids=ids,
@@ -114,12 +120,15 @@ def retrieve_context(question):
     else:
         document_filter = {"is_active": True}
 
-    query_embedding = list(
-        model.query_embed("query: " + question)
-    )[0]
+    response = llm.embeddings.create(
+        model=embedding_model,
+        input=[question]
+    )
+
+    query_embedding = response.data[0].embedding
 
     results = collection.query(
-        query_embeddings=[query_embedding.tolist()],
+        query_embeddings=[query_embedding],
         n_results=4,
         where=document_filter
     )

@@ -3,5 +3,4 @@ uvicorn
 pydantic
 python-dotenv
 chromadb
-fastembed
 openai
